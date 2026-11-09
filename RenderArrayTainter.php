@@ -2,28 +2,24 @@
 
 namespace mortenson\PsalmPluginDrupal;
 
-use PhpParser\Node\Expr\ArrayItem;
-use Psalm\Internal\Analyzer\StatementsAnalyzer;
+use PhpParser\Node\ArrayItem;
 use Psalm\Plugin\EventHandler\Event\AddRemoveTaintsEvent;
 use Psalm\Plugin\EventHandler\RemoveTaintsInterface;
+use Psalm\Type\TaintKind;
 
 class RenderArrayTainter implements RemoveTaintsInterface
 {
-    public static function removeTaints(AddRemoveTaintsEvent $event): array
+    public static function removeTaints(AddRemoveTaintsEvent $event): int
     {
         $item = $event->getExpr();
-        $statements_analyzer = $event->getStatementsSource();
-        if (!($item instanceof ArrayItem) || !($statements_analyzer instanceof StatementsAnalyzer)) {
-            return [];
+        if (!($item instanceof ArrayItem)) {
+            return 0;
         }
         $item_key_value = '';
         if ($item->key) {
-            if ($item_key_type = $statements_analyzer->node_data->getType($item->key)) {
-                $key_type = $item_key_type;
-
-                if ($key_type->isSingleStringLiteral()) {
-                    $item_key_value = $key_type->getSingleStringLiteral()->value;
-                }
+            $item_key_type = $event->getStatementsSource()->getNodeTypeProvider()->getType($item->key);
+            if ($item_key_type && $item_key_type->isSingleStringLiteral()) {
+                $item_key_value = $item_key_type->getSingleStringLiteral()->value;
             }
         }
 
@@ -55,9 +51,9 @@ class RenderArrayTainter implements RemoveTaintsInterface
             && !in_array($item_key_value, $dangerous_keys, true)
         ) {
             // We could/should use a custom taint type here.
-            return ['html'];
+            return TaintKind::INPUT_HTML;
         }
 
-        return [];
+        return 0;
     }
 }
